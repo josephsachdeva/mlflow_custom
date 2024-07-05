@@ -427,7 +427,7 @@ def start_run(
             files_to_log = get_file_names_to_log()
             for to_log in files_to_log:
                 client.log_artifact(run_id=active_run_obj.info.run_id, local_path=os.getcwd()+"/"+to_log, artifact_path=artifact_path)
-                client.log_text(text=get_code_of_current_ipynb(to_log), artifact_file=artifact_path+f"/{to_log}_code.py",
+                client.log_text(text=get_code_of_current_ipynb(to_log), artifact_file=artifact_path+f"/{to_log}.py",
                                 run_id=active_run_obj.info.run_id)
 
     except Exception as e:
