@@ -10,6 +10,7 @@ import logging
 import os
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from nbformat import read, NO_CONVERT
 
 import mlflow
 from mlflow.data.dataset import Dataset
@@ -207,6 +208,8 @@ def start_run(
     tags: Optional[Dict[str, Any]] = None,
     description: Optional[str] = None,
     log_system_metrics: Optional[bool] = None,
+    log_code: Optional[bool] = True,
+    artifact_path: Optional[str] = None
 ) -> ActiveRun:
     """
     Start a new MLflow run, setting it as the active run under which metrics and parameters
@@ -246,7 +249,10 @@ def start_run(
             to MLflow, e.g., cpu/gpu utilization. If None, we will check environment variable
             `MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING` to determine whether to log system metrics.
             System metrics logging is an experimental feature in MLflow 2.8 and subject to change.
-
+        log_code: bool, defaults to True. Logs the current .ipynb file as it is. Also, logs the
+            code snippets of all the jupyter code blocks in a text file.
+        artifact_path: str, path where to store the artifacts
+            NEEDED when log_code is True
     Returns:
         :py:class:`mlflow.ActiveRun` object that acts as a context manager wrapping the
         run's state.
@@ -411,9 +417,41 @@ def start_run(
         except Exception as e:
             _logger.error(f"Failed to start system metrics monitoring: {e}.")
 
+    # try:
+    if log_code:
+        _logger.info(msg="log_code is true")
+        if not artifact_path:
+            raise MlflowException(
+                "log_code is True, but artifact_path is not specified"
+            )
+        files_to_log = get_file_names_to_log()
+        for to_log in files_to_log:
+            client.log_artifact(run_id=active_run_obj.info.run_id, local_path=os.getcwd()+"/"+to_log, artifact_path=artifact_path)
+            client.log_text(text=get_code_of_current_ipynb(to_log), artifact_file=artifact_path+f"/{run_name}_code.py",
+                            run_id=active_run_obj.info.run_id)
+
+    # except Exception as e:
+    #     _logger.error(f"Error while automatic logging code: {e}")
+
     _active_run_stack.append(ActiveRun(active_run_obj))
     return _active_run_stack[-1]
 
+def get_file_names_to_log():
+    _logger.info(f"LIST DIR: {os.listdir()}")
+    return [file_name for file_name in os.listdir() if file_name.endswith(".ipynb")]
+
+
+def get_code_of_current_ipynb(nb_name):
+    nb_full_path = os.path.join(os.getcwd(), nb_name)
+    str_to_concat = ""
+    with open(nb_full_path) as fp:
+        notebook = read(fp, NO_CONVERT)
+    cells = notebook['cells']
+    code_cells = [c for c in cells if c['cell_type'] == 'code']
+    for no_cell, cell in enumerate(code_cells):
+        str_to_concat += f"####### Cell {no_cell} #########\n{cell['source']}\n\n"
+
+    return str_to_concat
 
 def end_run(status: str = RunStatus.to_string(RunStatus.FINISHED)) -> None:
     """
@@ -1272,7 +1310,7 @@ def log_image(
             .. warning::
 
                 - Out-of-range integer values will raise ValueError.
-                - Out-of-range float values will auto-scale with min/max and warn.
+                - Out-of-range float values will raise ValueError.
 
         - shape (H: height, W: width):
 
