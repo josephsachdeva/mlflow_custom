@@ -417,24 +417,25 @@ def start_run(
         except Exception as e:
             _logger.error(f"Failed to start system metrics monitoring: {e}.")
 
-    # try:
-    if log_code:
-        _logger.info(msg="log_code is true")
-        if not artifact_path:
-            raise MlflowException(
-                "log_code is True, but artifact_path is not specified"
-            )
-        files_to_log = get_file_names_to_log()
-        for to_log in files_to_log:
-            client.log_artifact(run_id=active_run_obj.info.run_id, local_path=os.getcwd()+"/"+to_log, artifact_path=artifact_path)
-            client.log_text(text=get_code_of_current_ipynb(to_log), artifact_file=artifact_path+f"/{run_name}_code.py",
-                            run_id=active_run_obj.info.run_id)
+    try:
+        if log_code:
+            _logger.info(msg="log_code is true")
+            if not artifact_path:
+                raise MlflowException(
+                    "log_code is True, but artifact_path is not specified"
+                )
+            files_to_log = get_file_names_to_log()
+            for to_log in files_to_log:
+                client.log_artifact(run_id=active_run_obj.info.run_id, local_path=os.getcwd()+"/"+to_log, artifact_path=artifact_path)
+                client.log_text(text=get_code_of_current_ipynb(to_log), artifact_file=artifact_path+f"/{run_name}_code.py",
+                                run_id=active_run_obj.info.run_id)
 
-    # except Exception as e:
-    #     _logger.error(f"Error while automatic logging code: {e}")
+    except Exception as e:
+        _logger.error(f"Error while automatic logging code: {e}")
 
     _active_run_stack.append(ActiveRun(active_run_obj))
     return _active_run_stack[-1]
+
 
 def get_file_names_to_log():
     _logger.info(f"LIST DIR: {os.listdir()}")
